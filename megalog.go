@@ -41,29 +41,28 @@ func (bot *Bot) Connect() (conn net.Conn){
 }
 
 func (bot *Bot) Join(channel string) {
-  fmt.Fprintf(bot.conn,"JOIN %s\r\n",channel)
+  bot.write <- fmt.Sprintf("JOIN %s\r\n",channel)
 }
 
 func (bot *Bot) RawCmd(message string) {
   fmt.Fprintf(bot.conn,message)
 }
 
-func (bot *Bot) Loop() {
-  reader := bufio.NewReader(bot.conn)
-  tp := textproto.NewReader( reader )
+func (bot *Bot) Loop(tp *textproto.Reader) {
   for {
     line, err := tp.ReadLine()
     if err != nil {
       break // break loop on errors
     }
-    fmt.Println(line)
-    // bot.read <- line
+
+    bot.read <- line
+    // fmt.Println(line)
+
     select {
     case command := <- bot.write:
       bot.RawCmd(command)
-      fmt.Println("sent message: ", command)
     default:
-      fmt.Println("none")
+      fmt.Println("d")
     }
   }
 }
@@ -72,19 +71,22 @@ func (bot *Bot) Run() {
   conn := bot.Connect()
   defer conn.Close()
 
-  read := make(chan string)
-  write := make(chan string)
+  read := make(chan string,1024)
+  write := make(chan string,1024)
 
   bot.read = read
   bot.write = write
 
   go func(read chan string) {
+    fmt.Println("listening...")
     message := <- bot.read
-    fmt.Println(message)
+    fmt.Println("FROM CHANNEL:" + message)
   }(read)
 
   go func() {
-    bot.Loop()
+    reader := bufio.NewReader(bot.conn)
+    tp := textproto.NewReader( reader )
+    bot.Loop(tp)
   }()
 
   user_cmd := fmt.Sprintf("USER %s 8 * :%s\r\n", bot.nick, bot.nick)
@@ -94,9 +96,9 @@ func (bot *Bot) Run() {
   bot.write <- user_cmd
   bot.write <- nick_cmd
   bot.write <- join_cmd
+  bot.write <- "JOIN #foofoo\r\n"
 
   for {
     time.Sleep(time.Second * 1)
   }
-
 }
