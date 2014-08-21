@@ -48,22 +48,21 @@ func (bot *Bot) RawCmd(message string) {
   fmt.Fprintf(bot.conn,message)
 }
 
-func (bot *Bot) Loop(tp *textproto.Reader) {
+func (bot *Bot) ReadLoop(tp *textproto.Reader) {
   for {
     line, err := tp.ReadLine()
     if err != nil {
       break // break loop on errors
     }
-
+    //if line is an event, dispatch to handle
     bot.read <- line
-    // fmt.Println(line)
+  }
+}
 
-    select {
-    case command := <- bot.write:
-      bot.RawCmd(command)
-    default:
-      fmt.Println("d")
-    }
+func (bot *Bot) WriteLoop() {
+  for {
+    cmd := <- bot.write
+    bot.RawCmd(cmd)
   }
 }
 
@@ -77,16 +76,24 @@ func (bot *Bot) Run() {
   bot.read = read
   bot.write = write
 
-  go func(read chan string) {
-    fmt.Println("listening...")
-    message := <- bot.read
-    fmt.Println("FROM CHANNEL:" + message)
-  }(read)
+  //display loop
+  go func() {
+    for {
+      message := <- bot.read
+      fmt.Println("FROM CHANNEL:" + message)
+    }
+  }()
+
+
+  //write loop
+  go func() {
+    bot.WriteLoop()
+  }()
 
   go func() {
     reader := bufio.NewReader(bot.conn)
     tp := textproto.NewReader( reader )
-    bot.Loop(tp)
+    bot.ReadLoop(tp)
   }()
 
   user_cmd := fmt.Sprintf("USER %s 8 * :%s\r\n", bot.nick, bot.nick)
