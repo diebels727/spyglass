@@ -5,7 +5,6 @@ import ("net"
         "bufio"
         "fmt"
         "net/textproto"
-        "time"
       )
 
 type Bot struct{
@@ -18,6 +17,8 @@ type Bot struct{
         read,write chan string
         conn net.Conn
 }
+
+var ready chan bool
 
 func New(server string,port string,nick string,user string,channel string,pass string) *Bot {
   return &Bot{server: server,
@@ -61,13 +62,17 @@ func (bot *Bot) ReadLoop(tp *textproto.Reader) {
 
 func (bot *Bot) WriteLoop() {
   for {
-    cmd := <- bot.write
-    bot.RawCmd(cmd)
+    select {
+      case cmd := <- bot.write:
+        bot.RawCmd(cmd)
+      default:
+    }
   }
 }
 
 func (bot *Bot) Run() {
   conn := bot.Connect()
+
   defer conn.Close()
 
   read := make(chan string,1024)
@@ -80,32 +85,22 @@ func (bot *Bot) Run() {
   go func() {
     for {
       message := <- bot.read
-      fmt.Println("FROM CHANNEL:" + message)
+      log.Println(message)  // switch this around to a io.Writer obj; probably logger interface
     }
   }()
-
 
   //write loop
   go func() {
     bot.WriteLoop()
   }()
 
+  //read loop
   go func() {
     reader := bufio.NewReader(bot.conn)
     tp := textproto.NewReader( reader )
     bot.ReadLoop(tp)
   }()
 
-  user_cmd := fmt.Sprintf("USER %s 8 * :%s\r\n", bot.nick, bot.nick)
-  nick_cmd := fmt.Sprintf("NICK %s\r\n", bot.nick)
-  join_cmd := fmt.Sprintf("JOIN %s\r\n", bot.channel)
+  ready <- true
 
-  bot.write <- user_cmd
-  bot.write <- nick_cmd
-  bot.write <- join_cmd
-  bot.write <- "JOIN #foofoo\r\n"
-
-  for {
-    time.Sleep(time.Second * 1)
-  }
 }
