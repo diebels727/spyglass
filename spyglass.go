@@ -12,19 +12,17 @@ type Bot struct{
         port string
         nick string
         user string
-        channel string
         pass string
-        read,write chan string
+        display,write,ping chan string
         conn net.Conn
 }
 
 var ready chan bool
 
-func New(server string,port string,nick string,user string,channel string,pass string) *Bot {
+func New(server string,port string,nick string,user string,pass string) *Bot {
   return &Bot{server: server,
               port: port,
               nick: nick,
-              channel: channel,
               pass: "",
               conn: nil,
               user: user}
@@ -46,23 +44,34 @@ func (bot *Bot) Join(channel string) {
 }
 
 func (bot *Bot) RawCmd(message string) {
-  fmt.Println("[RawCmd] Raw command message: ",message)
   fmt.Fprintf(bot.conn,message)
 }
 
 func (bot *Bot) ReadLoop(tp *textproto.Reader) {
   for {
-    fmt.Println("[ReadLoop] Reading from textproto.")
     line, err := tp.ReadLine()
-    fmt.Println("[ReadLoop] Read from textproto.")
-
     if err != nil {
-      fmt.Println("[ReadLoop] Error: ",err)
       break // break loop on errors
     }
+
+    event := line
     //if line is an event, dispatch to handle
-    fmt.Println("[ReadLoop] Raw line.")
-    bot.read <- line
+    fmt.Println("LINE[0]: ",event[0:1]==":")
+    if line[0:4] == "PING" {
+      fmt.Println("PING Received!")
+      message := event[5:]
+      fmt.Println("[PING]:",message)
+      bot.ping <- message
+    }
+    //bot.read is bot.display, change this
+
+    //strip /r/n from received messages
+    //convert line to an event
+    //decode the event
+    //if begins with :, then handle with msg type
+    //if begins with PING, then handle with ping loop
+
+    bot.display <- line
   }
 }
 
@@ -70,9 +79,8 @@ func (bot *Bot) WriteLoop() {
   for {
     select {
       case cmd := <- bot.write:
-        fmt.Println("[WriteLoop] Received command.")
+        fmt.Println("[WriteLoop] Command: ",cmd)
         bot.RawCmd(cmd)
-        fmt.Println("[WriteLoop] Sent command.")
       default:
     }
   }
@@ -83,41 +91,46 @@ func (bot *Bot) Run() {
     //defend against running a dupe
   }
 
-  read := make(chan string,1024)
+  display := make(chan string,1024)
   write := make(chan string,1024)
+  ping := make(chan string,1)
 
-  bot.read = read
+  bot.display = display
   bot.write = write
+  bot.ping = ping
 
   //display loop
   go func() {
-    fmt.Println("[Run] Launching DisplayLoop")
     for {
-      fmt.Println("[Run] Preparing to read from read channel.")
-      message := <- bot.read
-      fmt.Println("[Run] Read from channel.")
-
+      message := <- bot.display
       fmt.Println(message)  // switch this around to a io.Writer obj; probably logger interface
     }
   }()
 
   //write loop
   go func() {
-    fmt.Println("[Run] Launching WriteLoop")
     bot.WriteLoop()
+  }()
+
+  go func() {
+    for {
+      select {
+        case message := <- bot.ping:
+          fmt.Println("Ping Received, responding...")
+          bot.write <- fmt.Sprintf("PONG %s\r\n",message)
+          fmt.Println("Responded with pong...")
+        default:
+          //if timer, then ping
+      }
+    }
   }()
 
   //read loop
   go func() {
-    fmt.Println("[Run] Launching ReadLoop")
     reader := bufio.NewReader(bot.conn)
-    fmt.Println("[Run] Checking bot.conn: ",bot.conn)
     tp := textproto.NewReader(reader)
     bot.ReadLoop(tp)
   }()
 
-  fmt.Println("[Run] Triggering ready.")
   ready <- true
-  fmt.Println("[Run] Triggered ready.")
-
 }
