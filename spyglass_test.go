@@ -1,4 +1,4 @@
-package megalog
+package spyglass
 
 import(
   "testing"
