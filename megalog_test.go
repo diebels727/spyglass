@@ -10,6 +10,13 @@ import(
 func TestInit(t *testing.T) {
   ready = make(chan bool,1)
   m := New("localhost","6667","nick89122","jiggly101001","#cinch-bots","")
+  fmt.Println("[Run] Connecting")
+  // conn := bot.Connect()
+  bot.Connect()
+
+  fmt.Println("[Run] Connect finished execution.")
+
+  // defer conn.Close()
   m.Run()
 
   // <- ready

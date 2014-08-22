@@ -79,13 +79,9 @@ func (bot *Bot) WriteLoop() {
 }
 
 func (bot *Bot) Run() {
-  fmt.Println("[Run] Connecting")
-  // conn := bot.Connect()
-  bot.Connect()
-
-  fmt.Println("[Run] Connect finished execution.")
-
-  // defer conn.Close()
+  if bot.conn != nil {
+    //defend against running a dupe
+  }
 
   read := make(chan string,1024)
   write := make(chan string,1024)
