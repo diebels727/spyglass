@@ -16,6 +16,7 @@ type Bot struct{
         pass string
         display,write,ping chan string
         events chan *Event
+        ready chan bool
         conn net.Conn
         eventHandlers map[string]func(event *Event)
 }
@@ -62,7 +63,6 @@ func (e *Event) Parse() {
 
 }
 
-var ready chan bool
 
 func New(server string,port string,nick string,user string,pass string) *Bot {
   return &Bot{server: server,
@@ -88,8 +88,17 @@ func (bot *Bot) Join(channel string) {
   bot.write <- fmt.Sprintf("JOIN %s\r\n",channel)
 }
 
+//directly write to the server's connection, bypassing all scheduling.
 func (bot *Bot) RawCmd(message string) {
   fmt.Fprintf(bot.conn,message)
+}
+
+func (bot *Bot) Cmd(message string) {
+  bot.write <- fmt.Sprintf("%s\r\n",message)
+}
+
+func (bot *Bot) Send(message string) {
+  bot.write <- message
 }
 
 func (bot *Bot) ReadLoop(tp *textproto.Reader) {
@@ -137,6 +146,7 @@ func (bot *Bot) handleEvent(event *Event) {
 }
 
 func (bot *Bot) Run() {
+  bot.ready = make(chan bool,1)
   if bot.conn != nil {
     //defend against running a dupe
   }
@@ -201,5 +211,5 @@ func (bot *Bot) Run() {
     bot.ReadLoop(tp)
   }()
 
-  ready <- true
+  bot.ready <- true
 }
