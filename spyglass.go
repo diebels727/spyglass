@@ -14,13 +14,14 @@ type Bot struct{
         nick string
         user string
         pass string
-        display,write,ping chan string
+        display,write,ping,events chan string
         conn net.Conn
 }
 
 type Event struct {
   Source string
   Command string
+  RawCommand string
   Arguments string
   RawMessage string
   RawArguments string
@@ -50,7 +51,8 @@ func (e *Event) Parse() {
   current_message = message
   if i := strings.Index(message," "); i > -1 {
     current_message = message[i+1:len(current_message)]
-    e.Command = message[0:i]
+    e.RawCommand = message[0:i]
+    e.Command = strings.ToUpper(e.RawCommand)
     e.RawArguments = message[i+1:]
   } else {
     log.Println("Server IRC protocol error. Expected CMD ARGS, got",message)
@@ -110,9 +112,8 @@ func (bot *Bot) ReadLoop(tp *textproto.Reader) {
     //   }
     // }
     event := EventNew(line)
-    fmt.Println("EVENT SOURCE: ",event.Source)
-    fmt.Println("EVENT COMMAND: ",event.Command)
-    fmt.Println("EVENT RAW Arguments: ",event.RawArguments)
+
+    bot.events <- event
 
     //if line is an event, dispatch to handle
     // if line[0:4] == "PING" {
