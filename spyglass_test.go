@@ -9,7 +9,8 @@ import(
 //just a basic sniff test
 func TestInit(t *testing.T) {
   ready = make(chan bool,1)
-  m := New("localhost","6667","nick89122","jiggly101001","")
+  server := "localhost"
+  m := New(server,"6667","nick89122","jiggly101001","")
   fmt.Println("[Run] Connecting")
   conn := m.Connect()
   defer conn.Close()

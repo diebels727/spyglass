@@ -1,10 +1,11 @@
-package spyglass 
+package spyglass
 
 import ("net"
         "log"
         "bufio"
         "fmt"
         "net/textproto"
+        "strings"
       )
 
 type Bot struct{
@@ -15,6 +16,46 @@ type Bot struct{
         pass string
         display,write,ping chan string
         conn net.Conn
+}
+
+type Event struct {
+  Source string
+  Command string
+  Arguments string
+  RawMessage string
+  RawArguments string
+}
+
+//will become spyglass/event
+func EventNew(message string) (*Event) {
+  e := &Event{RawMessage: message}
+  e.Parse()
+  return e
+}
+
+func (e *Event) Parse() {
+  message := e.RawMessage
+  current_message := e.RawMessage
+
+  if message[0:1] == ":" {
+    if i := strings.Index(message," "); i > -1 {
+      current_message = message[i+1:len(message)] //peel off source
+      e.Source = message[0:i]
+    } else {
+      log.Println("Server IRC protocol error.  Expected :<source> CMD ARGS, got ",message)
+    }
+  }
+
+  message = current_message
+  current_message = message
+  if i := strings.Index(message," "); i > -1 {
+    current_message = message[i+1:len(current_message)]
+    e.Command = message[0:i]
+    e.RawArguments = message[i+1:]
+  } else {
+    log.Println("Server IRC protocol error. Expected CMD ARGS, got",message)
+  }
+
 }
 
 var ready chan bool
@@ -54,15 +95,33 @@ func (bot *Bot) ReadLoop(tp *textproto.Reader) {
       break // break loop on errors
     }
 
-    event := line
+    //decompose messages
+    //messages are in this format:
+    //
+    // :<source> COMMAND <ARGS>
+    //
+    // :<source> is optional
+
+    // if line[0:1] == ":" {
+    //   if i := strings.Index(line," "); i > -1 {
+    //     line = line[i+1:len(line)]
+    //   } else {
+    //     log.Println("Server IRC protocol error.  Expected :<source> CMD ARGS, got ",line)
+    //   }
+    // }
+    event := EventNew(line)
+    fmt.Println("EVENT SOURCE: ",event.Source)
+    fmt.Println("EVENT COMMAND: ",event.Command)
+    fmt.Println("EVENT RAW Arguments: ",event.RawArguments)
+
     //if line is an event, dispatch to handle
-    fmt.Println("LINE[0]: ",event[0:1]==":")
-    if line[0:4] == "PING" {
-      fmt.Println("PING Received!")
-      message := event[5:]
-      fmt.Println("[PING]:",message)
-      bot.ping <- message
-    }
+    // if line[0:4] == "PING" {
+    //   fmt.Println("PING Received!")
+    //   message := line[5:]
+    //   fmt.Println("[PING]:",message)
+    //   bot.ping <- message
+    // }
+
     //bot.read is bot.display, change this
 
     //strip /r/n from received messages
