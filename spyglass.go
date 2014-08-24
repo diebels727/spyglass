@@ -14,8 +14,10 @@ type Bot struct{
         nick string
         user string
         pass string
-        display,write,ping,events chan string
+        display,write,ping chan string
+        events chan *Event
         conn net.Conn
+        eventHandlers map[string]func()
 }
 
 type Event struct {
@@ -112,7 +114,6 @@ func (bot *Bot) ReadLoop(tp *textproto.Reader) {
     //   }
     // }
     event := EventNew(line)
-
     bot.events <- event
 
     //if line is an event, dispatch to handle
@@ -154,16 +155,26 @@ func (bot *Bot) Run() {
   display := make(chan string,1024)
   write := make(chan string,1024)
   ping := make(chan string,1)
+  events := make(chan *Event,1024)
 
   bot.display = display
   bot.write = write
   bot.ping = ping
+  bot.events = events
 
   //display loop
   go func() {
     for {
       message := <- bot.display
       fmt.Println(message)  // switch this around to a io.Writer obj; probably logger interface
+    }
+  }()
+
+  //event loop
+  go func() {
+    for {
+      event := <- bot.events
+      fmt.Println("[EventLoop] Event Command: ",event.Command)
     }
   }()
 
