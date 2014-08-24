@@ -155,8 +155,8 @@ func (bot *Bot) Run() {
   bot.eventHandlers = make(map[string]func(event *Event))
 
   bot.RegisterEventHandler("PING",func(event *Event) {
-    fmt.Println("[Event PING]: Handling ",event)
-    bot.write <- fmt.Sprintf("PONG %s\r\n",event.Source)
+    fmt.Println("[Event PING]: Handling ",event.RawArguments)
+    bot.write <- fmt.Sprintf("PONG %s\r\n",event.RawArguments)
   })
 
 
