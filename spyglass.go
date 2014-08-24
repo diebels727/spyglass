@@ -17,7 +17,7 @@ type Bot struct{
         display,write,ping chan string
         events chan *Event
         conn net.Conn
-        eventHandlers map[string]func()
+        eventHandlers map[string]func(event *Event)
 }
 
 type Event struct {
@@ -106,32 +106,8 @@ func (bot *Bot) ReadLoop(tp *textproto.Reader) {
     //
     // :<source> is optional
 
-    // if line[0:1] == ":" {
-    //   if i := strings.Index(line," "); i > -1 {
-    //     line = line[i+1:len(line)]
-    //   } else {
-    //     log.Println("Server IRC protocol error.  Expected :<source> CMD ARGS, got ",line)
-    //   }
-    // }
     event := EventNew(line)
     bot.events <- event
-
-    //if line is an event, dispatch to handle
-    // if line[0:4] == "PING" {
-    //   fmt.Println("PING Received!")
-    //   message := line[5:]
-    //   fmt.Println("[PING]:",message)
-    //   bot.ping <- message
-    // }
-
-    //bot.read is bot.display, change this
-
-    //strip /r/n from received messages
-    //convert line to an event
-    //decode the event
-    //if begins with :, then handle with msg type
-    //if begins with PING, then handle with ping loop
-
     bot.display <- line
   }
 }
@@ -144,6 +120,19 @@ func (bot *Bot) WriteLoop() {
         bot.RawCmd(cmd)
       default:
     }
+  }
+}
+
+// type handler func()
+
+func (bot *Bot) RegisterEventHandler(command string,handler func(event *Event) ) {
+  bot.eventHandlers[command] = handler
+}
+
+func (bot *Bot) handleEvent(event *Event) {
+  event_handler := bot.eventHandlers[event.Command]
+  if event_handler != nil {
+    event_handler(event)
   }
 }
 
@@ -162,6 +151,15 @@ func (bot *Bot) Run() {
   bot.ping = ping
   bot.events = events
 
+
+  bot.eventHandlers = make(map[string]func(event *Event))
+
+  bot.RegisterEventHandler("PING",func(event *Event) {
+    fmt.Println("[Event PING]: Handling ",event)
+    bot.write <- fmt.Sprintf("PONG %s\r\n",event.Source)
+  })
+
+
   //display loop
   go func() {
     for {
@@ -174,7 +172,7 @@ func (bot *Bot) Run() {
   go func() {
     for {
       event := <- bot.events
-      fmt.Println("[EventLoop] Event Command: ",event.Command)
+      bot.handleEvent(event)
     }
   }()
 
@@ -183,18 +181,18 @@ func (bot *Bot) Run() {
     bot.WriteLoop()
   }()
 
-  go func() {
-    for {
-      select {
-        case message := <- bot.ping:
-          fmt.Println("Ping Received, responding...")
-          bot.write <- fmt.Sprintf("PONG %s\r\n",message)
-          fmt.Println("Responded with pong...")
-        default:
-          //if timer, then ping
-      }
-    }
-  }()
+  // go func() {
+  //   for {
+  //     select {
+  //       case message := <- bot.ping:
+  //         fmt.Println("Ping Received, responding...")
+  //         bot.write <- fmt.Sprintf("PONG %s\r\n",message)
+  //         fmt.Println("Responded with pong...")
+  //       default:
+  //         //if timer, then ping
+  //     }
+  //   }
+  // }()
 
   //read loop
   go func() {
