@@ -16,7 +16,7 @@ type Bot struct{
         pass string
         display,write,ping chan string
         events chan *Event
-        ready chan bool
+        Ready,Stopped chan bool
         conn net.Conn
         eventHandlers map[string]func(event *Event)
 }
@@ -88,6 +88,16 @@ func (bot *Bot) Join(channel string) {
   bot.write <- fmt.Sprintf("JOIN %s\r\n",channel)
 }
 
+func (bot *Bot) User() {
+  bot.write <- fmt.Sprintf("USER %s 8 * :%s\r\n",bot.nick,bot.user)
+}
+
+func (bot *Bot) Nick() {
+  bot.write <- fmt.Sprintf("NICK %s\r\n",bot.nick)
+}
+
+
+
 //directly write to the server's connection, bypassing all scheduling.
 func (bot *Bot) RawCmd(message string) {
   fmt.Fprintf(bot.conn,message)
@@ -114,7 +124,6 @@ func (bot *Bot) ReadLoop(tp *textproto.Reader) {
     // :<source> COMMAND <ARGS>
     //
     // :<source> is optional
-
     event := EventNew(line)
     bot.events <- event
     bot.display <- line
@@ -125,14 +134,11 @@ func (bot *Bot) WriteLoop() {
   for {
     select {
       case cmd := <- bot.write:
-        fmt.Println("[WriteLoop] Command: ",cmd)
         bot.RawCmd(cmd)
       default:
     }
   }
 }
-
-// type handler func()
 
 func (bot *Bot) RegisterEventHandler(command string,handler func(event *Event) ) {
   bot.eventHandlers[command] = handler
@@ -146,7 +152,9 @@ func (bot *Bot) handleEvent(event *Event) {
 }
 
 func (bot *Bot) Run() {
-  bot.ready = make(chan bool,1)
+  bot.Ready = make(chan bool,1)
+  bot.Stopped = make(chan bool,1)
+
   if bot.conn != nil {
     //defend against running a dupe
   }
@@ -161,14 +169,12 @@ func (bot *Bot) Run() {
   bot.ping = ping
   bot.events = events
 
-
   bot.eventHandlers = make(map[string]func(event *Event))
 
   bot.RegisterEventHandler("PING",func(event *Event) {
     fmt.Println("[Event PING]: Handling ",event.RawArguments)
     bot.write <- fmt.Sprintf("PONG %s\r\n",event.RawArguments)
   })
-
 
   //display loop
   go func() {
@@ -191,19 +197,6 @@ func (bot *Bot) Run() {
     bot.WriteLoop()
   }()
 
-  // go func() {
-  //   for {
-  //     select {
-  //       case message := <- bot.ping:
-  //         fmt.Println("Ping Received, responding...")
-  //         bot.write <- fmt.Sprintf("PONG %s\r\n",message)
-  //         fmt.Println("Responded with pong...")
-  //       default:
-  //         //if timer, then ping
-  //     }
-  //   }
-  // }()
-
   //read loop
   go func() {
     reader := bufio.NewReader(bot.conn)
@@ -211,5 +204,5 @@ func (bot *Bot) Run() {
     bot.ReadLoop(tp)
   }()
 
-  bot.ready <- true
+  bot.Ready <- true
 }
