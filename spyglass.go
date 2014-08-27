@@ -9,16 +9,16 @@ import ("net"
       )
 
 type Bot struct{
-        server string
-        port string
-        nick string
-        user string
-        pass string
-        display,write,ping chan string
-        events chan *Event
-        Ready,Stopped chan bool
-        conn net.Conn
-        eventHandlers map[string]func(event *Event)
+  server string
+  port string
+  nick string
+  user string
+  pass string
+  display,write,ping chan string
+  events chan *Event
+  Ready,Stopped chan bool
+  Conn net.Conn
+  eventHandlers map[string]func(event *Event)
 }
 
 type Event struct {
@@ -65,12 +65,14 @@ func (e *Event) Parse() {
 
 
 func New(server string,port string,nick string,user string,pass string) *Bot {
-  return &Bot{server: server,
+  bot := &Bot{server: server,
               port: port,
               nick: nick,
               pass: "",
-              conn: nil,
+              Conn: nil,
               user: user}
+  bot.eventHandlers = make(map[string]func(event *Event))
+  return bot
 }
 
 func (bot *Bot) Connect() (conn net.Conn){
@@ -79,12 +81,13 @@ func (bot *Bot) Connect() (conn net.Conn){
   if err != nil{
     log.Fatal("unable to connect to IRC server ", err)
   }
-  bot.conn = conn
-  log.Printf("Connected to IRC server %s (%s)\n", bot.server, bot.conn.RemoteAddr())
-  return bot.conn
+  bot.Conn = conn
+  log.Printf("Connected to IRC server %s (%s)\n", bot.server, bot.Conn.RemoteAddr())
+  return bot.Conn
 }
 
 func (bot *Bot) Join(channel string) {
+  fmt.Println("[JOINING]",channel)
   bot.write <- fmt.Sprintf("JOIN %s\r\n",channel)
 }
 
@@ -96,11 +99,13 @@ func (bot *Bot) Nick() {
   bot.write <- fmt.Sprintf("NICK %s\r\n",bot.nick)
 }
 
-
+func (bot *Bot) List() {
+  bot.write <- "LIST \r\n"
+}
 
 //directly write to the server's connection, bypassing all scheduling.
 func (bot *Bot) RawCmd(message string) {
-  fmt.Fprintf(bot.conn,message)
+  fmt.Fprintf(bot.Conn,message)
 }
 
 func (bot *Bot) Cmd(message string) {
@@ -155,7 +160,7 @@ func (bot *Bot) Run() {
   bot.Ready = make(chan bool,1)
   bot.Stopped = make(chan bool,1)
 
-  if bot.conn != nil {
+  if bot.Conn != nil {
     //defend against running a dupe
   }
 
@@ -169,10 +174,7 @@ func (bot *Bot) Run() {
   bot.ping = ping
   bot.events = events
 
-  bot.eventHandlers = make(map[string]func(event *Event))
-
   bot.RegisterEventHandler("PING",func(event *Event) {
-    fmt.Println("[Event PING]: Handling ",event.RawArguments)
     bot.write <- fmt.Sprintf("PONG %s\r\n",event.RawArguments)
   })
 
@@ -199,7 +201,7 @@ func (bot *Bot) Run() {
 
   //read loop
   go func() {
-    reader := bufio.NewReader(bot.conn)
+    reader := bufio.NewReader(bot.Conn)
     tp := textproto.NewReader(reader)
     bot.ReadLoop(tp)
   }()
