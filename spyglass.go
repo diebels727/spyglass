@@ -112,7 +112,7 @@ func (bot *Bot) Connect() (conn net.Conn){
 
 func (bot *Bot) Join(channel string) {
   bot.JoinedChannels = append(bot.JoinedChannels,channel)
-  num_channels = len(bot.JoinedChannels)
+  num_channels := len(bot.JoinedChannels)
   log.Printf("[%s] Joined %d channels",bot.nick,num_channels)
   bot.write <- fmt.Sprintf("JOIN %s\r\n",channel)
 }
