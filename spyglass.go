@@ -224,11 +224,7 @@ func (bot *Bot) Run() {
   go func() {
     for {
       event := <- bot.log
-
       statement := fmt.Sprintf("INSERT INTO events(timestamp,source,command,target,message) VALUES(\"%s\",\"%s\",\"%s\",\"%s\",\"%s\");",event.Timestamp,event.Source,event.Command,event.Target,event.Message)
-
-      fmt.Println(bot.DB)
-
       bot.DB.Exec(statement)
     }
   }()
