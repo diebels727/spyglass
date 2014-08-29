@@ -23,7 +23,10 @@ type Bot struct{
   Ready,Stopped chan bool
   Conn net.Conn
   eventHandlers map[string]func(event *Event)
+
   DB *sqlite3.Conn
+
+  JoinedChannels []string
 }
 
 type Event struct {
@@ -108,6 +111,9 @@ func (bot *Bot) Connect() (conn net.Conn){
 }
 
 func (bot *Bot) Join(channel string) {
+  bot.JoinedChannels = append(bot.JoinedChannels,channel)
+  num_channels = len(bot.JoinedChannels)
+  log.Printf("[%s] Joined %d channels",bot.nick,num_channels)
   bot.write <- fmt.Sprintf("JOIN %s\r\n",channel)
 }
 
@@ -179,6 +185,8 @@ func (bot *Bot) handleEvent(event *Event) {
 }
 
 func (bot *Bot) Run() {
+  bot.JoinedChannels = make([]string,0)
+
   bot.Ready = make(chan bool,1)
   bot.Stopped = make(chan bool,1)
 
