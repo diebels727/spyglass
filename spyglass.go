@@ -6,6 +6,9 @@ import ("net"
         "fmt"
         "net/textproto"
         "strings"
+        "time"
+
+        "code.google.com/p/go-sqlite/go1/sqlite3"
       )
 
 type Bot struct{
@@ -16,9 +19,11 @@ type Bot struct{
   pass string
   display,write,ping chan string
   events chan *Event
+  log chan *Event
   Ready,Stopped chan bool
   Conn net.Conn
   eventHandlers map[string]func(event *Event)
+  DB *sqlite3.Conn
 }
 
 type Event struct {
@@ -28,6 +33,9 @@ type Event struct {
   Arguments string
   RawMessage string
   RawArguments string
+  Target string
+  Message string
+  Timestamp string
 }
 
 //will become spyglass/event
@@ -38,6 +46,10 @@ func EventNew(message string) (*Event) {
 }
 
 func (e *Event) Parse() {
+  t := time.Now().Unix()
+  t_str := fmt.Sprintf("%d",t)
+  e.Timestamp = t_str
+
   message := e.RawMessage
   current_message := e.RawMessage
 
@@ -57,6 +69,15 @@ func (e *Event) Parse() {
     e.RawCommand = message[0:i]
     e.Command = strings.ToUpper(e.RawCommand)
     e.RawArguments = message[i+1:]
+
+    if j := strings.Index(e.RawArguments," ");j > -1 {
+      e.Target = e.RawArguments[0:j]
+
+      if k := strings.Index(e.RawArguments[j+1:],":");k > -1 {
+        e.Message = e.RawArguments[j+k+1:]
+      }
+    }
+
   } else {
     log.Println("Server IRC protocol error. Expected CMD ARGS, got",message)
   }
@@ -87,7 +108,6 @@ func (bot *Bot) Connect() (conn net.Conn){
 }
 
 func (bot *Bot) Join(channel string) {
-  fmt.Println("[JOINING]",channel)
   bot.write <- fmt.Sprintf("JOIN %s\r\n",channel)
 }
 
@@ -132,6 +152,8 @@ func (bot *Bot) ReadLoop(tp *textproto.Reader) {
     event := EventNew(line)
     bot.events <- event
     bot.display <- line
+
+    bot.log <- event
   }
 }
 
@@ -174,6 +196,10 @@ func (bot *Bot) Run() {
   bot.ping = ping
   bot.events = events
 
+  //logging to db support ... need to abstract
+  log := make(chan *Event,1024)
+  bot.log = log
+
   bot.RegisterEventHandler("PING",func(event *Event) {
     bot.write <- fmt.Sprintf("PONG %s\r\n",event.RawArguments)
   })
@@ -190,7 +216,20 @@ func (bot *Bot) Run() {
   go func() {
     for {
       event := <- bot.events
-      bot.handleEvent(event)
+      bot.handleEvent(event)  //perhaps a heap, and assign priority to events?
+    }
+  }()
+
+  // log loop
+  go func() {
+    for {
+      event := <- bot.log
+
+      statement := fmt.Sprintf("INSERT INTO events(timestamp,source,command,target,message) VALUES(\"%s\",\"%s\",\"%s\",\"%s\",\"%s\");",event.Timestamp,event.Source,event.Command,event.Target,event.Message)
+
+      fmt.Println(bot.DB)
+
+      bot.DB.Exec(statement)
     }
   }()
 
