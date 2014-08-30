@@ -110,6 +110,10 @@ func (bot *Bot) Connect() (conn net.Conn){
   return bot.Conn
 }
 
+func (bot *Bot) GetNick() string {
+  return bot.nick
+}
+
 func (bot *Bot) Join(channel string) {
   bot.JoinedChannels = append(bot.JoinedChannels,channel)
   num_channels := len(bot.JoinedChannels)
@@ -232,7 +236,7 @@ func (bot *Bot) Run() {
   go func() {
     for {
       event := <- bot.log
-      statement := fmt.Sprintf("INSERT INTO events(timestamp,source,command,target,message) VALUES(\"%s\",\"%s\",\"%s\",\"%s\",\"%s\");",event.Timestamp,event.Source,event.Command,event.Target,event.Message)
+      statement := fmt.Sprintf("INSERT INTO events(bot,timestamp,source,command,target,message) VALUES(\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\");",bot.nick,event.Timestamp,event.Source,event.Command,event.Target,event.Message)
       bot.DB.Exec(statement)
     }
   }()
