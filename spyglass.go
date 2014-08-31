@@ -129,8 +129,8 @@ func (bot *Bot) Nick() {
   bot.write <- fmt.Sprintf("NICK %s\r\n",bot.nick)
 }
 
-func (bot *Bot) List(minimum int) {
-  bot.write <- fmt.Sprintf("LIST -MIN %d\r\n",minimum)
+func (bot *Bot) List() {
+  bot.write <- fmt.Sprintf("LIST\r\n",minimum)
 }
 
 //directly write to the server's connection, bypassing all scheduling.
