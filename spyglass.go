@@ -130,7 +130,7 @@ func (bot *Bot) Nick() {
 }
 
 func (bot *Bot) List() {
-  bot.write <- fmt.Sprintf("LIST\r\n",minimum)
+  bot.write <- fmt.Sprintf("LIST\r\n")
 }
 
 //directly write to the server's connection, bypassing all scheduling.
