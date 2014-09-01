@@ -86,8 +86,6 @@ func (e *Event) Parse() {
   } else {
     log.Println("Server IRC protocol error. Expected CMD ARGS, got",message)
   }
-  // debug_str := fmt.Sprintf("[DEBUG] Parsed Event: Source: %s RawCommand: %s Command: %s RawArguments: %s Target: %s Message: %s",e.Source,e.RawCommand,e.Command,e.RawArguments,e.Target,e.Message)
-  // fmt.Println(debug_str)
 }
 
 
@@ -130,7 +128,6 @@ func (bot *Bot) JoinAndLog(channel string,users int) {
   joined_at := fmt.Sprintf("%d",t)
   statement := fmt.Sprintf("INSERT INTO channels(name,users,joined_at) VALUES(\"%s\",\"%d\",\"%s\");",channel,users,joined_at)
   bot.DB.Exec(statement)
-
 }
 
 func (bot *Bot) User() {
