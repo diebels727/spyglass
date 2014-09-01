@@ -56,7 +56,8 @@ func (e *Event) Parse() {
   message := e.RawMessage
   current_message := e.RawMessage
 
-  if message[0:1] == ":" {
+  //guard against an anomaly where the message length is zero
+  if (len(message) >= 1) && (message[0:1] == ":") {
     if i := strings.Index(message," "); i > -1 {
       current_message = message[i+1:len(message)] //peel off source
       e.Source = message[0:i]
@@ -66,7 +67,8 @@ func (e *Event) Parse() {
   }
 
   message = current_message
-  current_message = message
+  // current_message = message
+
   if i := strings.Index(message," "); i > -1 {
     current_message = message[i+1:len(current_message)]
     e.RawCommand = message[0:i]
@@ -84,7 +86,8 @@ func (e *Event) Parse() {
   } else {
     log.Println("Server IRC protocol error. Expected CMD ARGS, got",message)
   }
-
+  // debug_str := fmt.Sprintf("[DEBUG] Parsed Event: Source: %s RawCommand: %s Command: %s RawArguments: %s Target: %s Message: %s",e.Source,e.RawCommand,e.Command,e.RawArguments,e.Target,e.Message)
+  // fmt.Println(debug_str)
 }
 
 
@@ -119,6 +122,15 @@ func (bot *Bot) Join(channel string) {
   num_channels := len(bot.JoinedChannels)
   log.Printf("[%s] Joined %d channels",bot.nick,num_channels)
   bot.write <- fmt.Sprintf("JOIN %s\r\n",channel)
+}
+
+func (bot *Bot) JoinAndLog(channel string,users int) {
+  bot.Join(channel)
+  t := time.Now().Unix()
+  joined_at := fmt.Sprintf("%d",t)
+  statement := fmt.Sprintf("INSERT INTO channels(name,users,joined_at) VALUES(\"%s\",\"%d\",\"%s\");",channel,users,joined_at)
+  bot.DB.Exec(statement)
+
 }
 
 func (bot *Bot) User() {
