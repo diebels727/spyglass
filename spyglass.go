@@ -7,8 +7,6 @@ import ("net"
         "net/textproto"
         "strings"
         "time"
-
-        "code.google.com/p/go-sqlite/go1/sqlite3"
       )
 
 type Bot struct{
@@ -19,14 +17,16 @@ type Bot struct{
   pass string
   display,write,ping chan string
   events chan *Event
-  log chan *Event
+  datastore chan *Event
   Ready,Stopped chan bool
   Conn net.Conn
   eventHandlers map[string]func(event *Event)
 
-  DB *sqlite3.Conn
+  Datastore Datastore
+}
 
-  JoinedChannels []string
+type Datastore interface {
+  Write(event *Event)
 }
 
 type Event struct {
@@ -116,18 +116,7 @@ func (bot *Bot) GetNick() string {
 }
 
 func (bot *Bot) Join(channel string) {
-  bot.JoinedChannels = append(bot.JoinedChannels,channel)
-  num_channels := len(bot.JoinedChannels)
-  log.Printf("[%s] Joined %d channels",bot.nick,num_channels)
   bot.write <- fmt.Sprintf("JOIN %s\r\n",channel)
-}
-
-func (bot *Bot) JoinAndLog(channel string,users int) {
-  bot.Join(channel)
-  t := time.Now().Unix()
-  joined_at := fmt.Sprintf("%d",t)
-  statement := fmt.Sprintf("INSERT INTO channels(name,users,joined_at) VALUES(\"%s\",\"%d\",\"%s\");",channel,users,joined_at)
-  bot.DB.Exec(statement)
 }
 
 func (bot *Bot) User() {
@@ -171,8 +160,7 @@ func (bot *Bot) ReadLoop(tp *textproto.Reader) {
     event := EventNew(line)
     bot.events <- event
     bot.display <- line
-
-    bot.log <- event
+    bot.datastore <- event
   }
 }
 
@@ -198,8 +186,6 @@ func (bot *Bot) handleEvent(event *Event) {
 }
 
 func (bot *Bot) Run() {
-  bot.JoinedChannels = make([]string,0)
-
   bot.Ready = make(chan bool,1)
   bot.Stopped = make(chan bool,1)
 
@@ -216,10 +202,6 @@ func (bot *Bot) Run() {
   bot.write = write
   bot.ping = ping
   bot.events = events
-
-  //logging to db support ... need to abstract
-  log := make(chan *Event,1024)
-  bot.log = log
 
   bot.RegisterEventHandler("PING",func(event *Event) {
     bot.write <- fmt.Sprintf("PONG %s\r\n",event.RawArguments)
@@ -241,12 +223,14 @@ func (bot *Bot) Run() {
     }
   }()
 
-  // log loop
+  //logging to datastore support
+  datastore := make(chan *Event,1024)
+  bot.datastore = datastore
+  // datastore loop
   go func() {
     for {
-      event := <- bot.log
-      statement := fmt.Sprintf("INSERT INTO events(bot,timestamp,source,command,target,message) VALUES(\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\");",bot.nick,event.Timestamp,event.Source,event.Command,event.Target,event.Message)
-      bot.DB.Exec(statement)
+      event := <- bot.datastore
+      bot.Datastore.Write(event)
     }
   }()
 
