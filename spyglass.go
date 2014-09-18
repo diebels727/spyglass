@@ -31,6 +31,8 @@ type Datastore interface {
 
 type Event struct {
   Source string
+  User string
+  URI string
   Command string
   RawCommand string
   Arguments string
@@ -58,11 +60,23 @@ func (e *Event) Parse() {
   if (len(message) >= 1) && (message[0:1] == ":") {
     if i := strings.Index(message," "); i > -1 {
       current_message = message[i+1:len(message)] //peel off source
-      e.Source = message[0:i]
+      e.Source = message[1:i]
+      source := e.Source
+      if (len(source) >= 1) {
+        if i := strings.Index(source,"~!"); i > -1 {
+          e.User = source[0:i]
+          e.URI = source[i+1:len(source)]
+        } else {
+          log.Println("Parse error.  Could not parse source.")
+        }
+      }
+
     } else {
       log.Println("Server IRC protocol error.  Expected :<source> CMD ARGS, got ",message)
     }
   }
+
+
 
   message = current_message
   // current_message = message
