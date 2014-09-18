@@ -38,7 +38,7 @@ type Event struct {
   RawArguments string
   Target string
   Message string
-  Timestamp string
+  Timestamp int64
 }
 
 //will become spyglass/event
@@ -49,9 +49,7 @@ func EventNew(message string) (*Event) {
 }
 
 func (e *Event) Parse() {
-  t := time.Now().Unix()
-  t_str := fmt.Sprintf("%d",t)
-  e.Timestamp = t_str
+  e.Timestamp = time.Now().Unix()
 
   message := e.RawMessage
   current_message := e.RawMessage
