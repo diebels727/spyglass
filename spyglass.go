@@ -63,8 +63,10 @@ func (e *Event) Parse() {
       e.Source = message[1:i]
       source := e.Source
       if (len(source) >= 1) {
-        if i := strings.Index(source,"~!"); i > -1 {
+        if i := strings.Index(source,"!~"); i > -1 {
           e.User = source[0:i]
+        }
+        if i := strings.Index(source,"@"); i > -1 {
           e.URI = source[i+1:len(source)]
         }
       }
