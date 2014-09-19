@@ -66,8 +66,6 @@ func (e *Event) Parse() {
         if i := strings.Index(source,"~!"); i > -1 {
           e.User = source[0:i]
           e.URI = source[i+1:len(source)]
-        } else {
-          log.Println("Parse error.  Could not parse source.")
         }
       }
 
