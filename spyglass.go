@@ -15,7 +15,7 @@ type Bot struct{
   nick string
   user string
   pass string
-  display,write,ping chan string
+  display,write chan string
   events chan *Event
   datastore chan *Event
   Ready,Stopped chan bool
@@ -207,23 +207,30 @@ func (bot *Bot) Run() {
 
   display := make(chan string,1024)
   write := make(chan string,1024)
-  ping := make(chan string,1)
   events := make(chan *Event,1024)
 
   bot.display = display
   bot.write = write
-  bot.ping = ping
   bot.events = events
 
   bot.RegisterEventHandler("PING",func(event *Event) {
     bot.write <- fmt.Sprintf("PONG %s\r\n",event.RawArguments)
   })
 
+  //ping loop every 120 seconds
+  ticker := time.NewTicker(time.Second * 120)
+  go func() {
+    for _ = range ticker.C {
+      bot.write <- fmt.Sprintf("PING %s\r\n",bot.server)
+      bot.display <- fmt.Sprintf("Ping sent.")
+    }
+  }()
+
   //display loop
   go func() {
     for {
       message := <- bot.display
-      fmt.Println(message)  // switch this around to a io.Writer obj; probably logger interface
+      fmt.Printf("[%s] %s\n",bot.nick,message)  // switch this around to a io.Writer obj; probably logger interface
     }
   }()
 
