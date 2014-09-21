@@ -222,7 +222,6 @@ func (bot *Bot) Run() {
   go func() {
     for _ = range ticker.C {
       bot.write <- fmt.Sprintf("PING %s\r\n",bot.server)
-      bot.display <- fmt.Sprintf("Ping sent.")
     }
   }()
 
